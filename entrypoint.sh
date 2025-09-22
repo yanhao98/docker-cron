@@ -17,12 +17,13 @@ CRON_SCHEDULE="${CRON_SCHEDULE:-*/30 * * * *}"
 INIT_SCRIPTS_DIR="${INIT_SCRIPTS_DIR:-/docker-entrypoint-init.d}"
 CRON_TASKS_DIR="${CRON_TASKS_DIR:-/docker-cron.d}"
 APK_PACKAGES="${APK_PACKAGES:-}"
+RUN_CRON_ON_START="${RUN_CRON_ON_START:-false}"
 
 STDOUT_FD="/proc/1/fd/1"
 STDERR_FD="/proc/1/fd/2"
 CRON_SCRIPT="/usr/local/bin/run-cron-tasks.sh"
 
-readonly CRON_SCHEDULE INIT_SCRIPTS_DIR CRON_TASKS_DIR APK_PACKAGES STDOUT_FD STDERR_FD CRON_SCRIPT
+readonly CRON_SCHEDULE INIT_SCRIPTS_DIR CRON_TASKS_DIR APK_PACKAGES RUN_CRON_ON_START STDOUT_FD STDERR_FD CRON_SCRIPT
 
 if [ -z "$CRON_SCHEDULE" ]; then
   log_error "CRON_SCHEDULE is empty; refusing to start."
@@ -71,6 +72,19 @@ else
 fi
 
 log_info "initialization complete"
+
+case "$RUN_CRON_ON_START" in
+  1|[Tt][Rr][Uu][Ee]|[Yy][Ee][Ss])
+    log_info "running cron tasks once at startup"
+    if ! "$CRON_SCRIPT" >>"$STDOUT_FD" 2>>"$STDERR_FD"; then
+      log_error "startup execution of cron tasks failed"
+      exit 1
+    fi
+    ;;
+  *)
+    :
+    ;;
+esac
 
 cron_env_file=/var/spool/cron/crontabs/root
 {
