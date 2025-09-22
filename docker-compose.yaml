@@ -1,0 +1,43 @@
+volumes:
+  tmp:
+    external: false
+services:
+  postgres17:
+    container_name: postgres17
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=pguser
+      - POSTGRES_PASSWORD=pgpass
+      - POSTGRES_DB=_
+    volumes:
+      - ./backups:/backups:rw
+      - tmp:/var/lib/postgresql/data
+    image: postgres:17
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backup-cron:
+    depends_on:
+      postgres17:
+        condition: service_healthy
+    image: ghcr.io/yanhao98/docker-cron:main
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - APK_PACKAGES=curl jq
+      - CRON_SCHEDULE=*/1 * * * *
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./backups:/backups:ro
+      # - ./examples/init:/docker-entrypoint-init.d
+      - type: bind
+        source: ./examples/cron/10-postgres-dump-docker-sock.sh
+        target: /docker-cron.d/10-postgres-dump-docker-sock.sh
+        bind:
+          create_host_path: false
+    restart: unless-stopped

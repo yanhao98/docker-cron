@@ -1,0 +1,42 @@
+# name: _打包推送镜像
+on:
+  workflow_dispatch:
+  push:
+permissions:
+  packages: write
+env:
+  TZ: Asia/Shanghai
+
+jobs:
+  build-and-push-ghcr:
+    runs-on: ubuntu-latest
+    env:
+      # https://github.com/docker/metadata-action/tree/v5/?tab=readme-ov-file#semver
+      # Event: push,     Ref: refs/head/main,       Tags: main
+      # Event: push tag, Ref: refs/tags/v1.2.3,     Tags: 1.2.3, 1.2, 1, latest
+      # Event: push tag, Ref: refs/tags/v2.0.8-rc1, Tags: 2.0.8-rc1
+      metadata-action-tags: |
+        type=ref,event=branch
+        type=semver,pattern={{version}}
+        type=semver,pattern={{major}}.{{minor}}
+        type=semver,pattern={{major}}
+
+    steps:
+      - name: 🔑 登录 GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🐳 构建并推送 Docker 镜像
+        uses: yanhao98/composite-actions/docker-build-push@main
+        with:
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          load: false
+          meta_images: ghcr.io/${{ github.repository }}
+          meta_tags: ${{ env.metadata-action-tags }}
+          cache-from: type=gha,scope=${{ github.workflow }}
+          cache-to: type=gha,scope=${{ github.workflow }}
