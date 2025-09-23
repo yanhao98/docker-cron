@@ -1,7 +1,23 @@
 volumes:
-  tmp:
+  tmp-postgres17:
+    external: false
+  tmp-mysql9:
     external: false
 services:
+  mysql9:
+    restart: unless-stopped
+    container_name: mysql9
+    environment:
+      MYSQL_ROOT_PASSWORD: mysqlrootpass
+    volumes:
+      - ./backups:/backups
+      - tmp-mysql9:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
+      interval: 5s
+      timeout: 10s
+      retries: 5
+    image: mysql:9
   postgres17:
     container_name: postgres17
     restart: unless-stopped
@@ -11,7 +27,7 @@ services:
       - POSTGRES_DB=_
     volumes:
       - ./backups:/backups:rw
-      - tmp:/var/lib/postgresql/data
+      - tmp-postgres17:/var/lib/postgresql/data
     image: postgres:17
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
